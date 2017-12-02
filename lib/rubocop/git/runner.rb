@@ -8,15 +8,23 @@ module RuboCop
         options = Options.new(options) unless options.is_a?(Options)
 
         @options = options
+        if options.cached && !`git diff`.empty?
+          puts 'Sorry, cannot proceed when changes are staged only partially'
+          exit(1)
+        end
         @files = DiffParser.parse(git_diff(options))
         rubo_comment = RuboComment.new(@files)
 
-        #adds comments to files and reparses diff after changes are made
+        # adds comments to files and reparses diff after changes are made
         rubo_comment.add_comments
+
+        puts "\n[WARNING] Adding hacky lines to git index\n"
+        `git add #{@files.map(&:filename).join(' ')}`
+
         @files = DiffParser.parse(git_diff(options))
 
         display_violations($stdout)
-        #removes comments after rubocop processing
+        # removes comments after rubocop processing
         rubo_comment.remove_comments
 
         exit(1) if violations.any?
